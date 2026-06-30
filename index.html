@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bank Pustaka SKN</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    margin: 0; background: #f4f6f9; color: #1f2937;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 24px 16px 60px; }
+  .head { text-align: center; margin-bottom: 8px; }
+  .head h1 { margin: 0; font-size: 24px; color: #1d4ed8; }
+  .head p { margin: 6px 0 0; color: #6b7280; font-size: 14px; }
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+          padding: 20px; margin-top: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  label { font-weight: 600; font-size: 14px; display: block; margin-bottom: 6px; }
+  select, textarea {
+    width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 10px;
+    font-size: 15px; font-family: inherit; background: #fff;
+  }
+  textarea { min-height: 160px; resize: vertical; }
+  .row { margin-bottom: 16px; }
+  button {
+    width: 100%; padding: 14px; border: none; border-radius: 10px;
+    background: #1d4ed8; color: #fff; font-size: 16px; font-weight: 700;
+    cursor: pointer; transition: background .15s;
+  }
+  button:hover { background: #1e40af; }
+  button:disabled { background: #9ca3af; cursor: not-allowed; }
+  #hasil { white-space: pre-wrap; line-height: 1.6; font-size: 15px; }
+  #hasilCard { display: none; }
+  .loading { text-align: center; color: #6b7280; padding: 20px; }
+  .spinner {
+    width: 28px; height: 28px; border: 3px solid #e5e7eb; border-top-color: #1d4ed8;
+    border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 10px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .err { color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca;
+         padding: 12px; border-radius: 10px; }
+  .foot { text-align: center; color: #9ca3af; font-size: 12px; margin-top: 24px; }
+  .pustaka { max-width: 820px; margin: 14px auto 0; background: #eef2ff;
+             border: 1px solid #c7d2fe; border-radius: 10px; padding: 10px 14px; font-size: 14px; }
+  .pustaka summary { cursor: pointer; font-weight: 600; color: #1d4ed8; }
+  .pustaka .isi { margin-top: 8px; color: #374151; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>🏛️ Bank Pustaka SKN</h1>
+    <p>Tempel masalah lapangan / transkrip rekaman → dapat solusi dari pustaka SKN</p>
+  </div>
+
+  <details class="pustaka" id="pustakaBox">
+    <summary>📚 Memuat daftar buku…</summary>
+    <div class="isi" id="daftarBuku"></div>
+  </details>
+
+  <div class="card">
+    <div class="row">
+      <label for="divisi">Divisi</label>
+      <select id="divisi">
+        <option>Sales</option>
+        <option>HRD</option>
+        <option>Support</option>
+        <option>Lainnya</option>
+      </select>
+    </div>
+
+    <div class="row" style="background:#f0f7ff; border:1px dashed #93c5fd; border-radius:12px; padding:14px;">
+      <label for="berkas">🎙️ Upload rekaman sales (Gemini dengar langsung — paham logat daerah)</label>
+      <input type="file" id="berkas" accept="audio/*,.opus,.ogg,.oga,.m4a,.mp3,.wav,.flac,.aac">
+      <button id="tombolAudio" onclick="prosesAudio()" style="margin-top:12px;">🎧 Transkrip &amp; Cari Solusi</button>
+      <p style="font-size:13px; color:#6b7280; margin:10px 0 0;">
+        Pakai voice note WA (.opus/.ogg), mp3, m4a, atau wav. File .amr (rekaman telepon) convert dulu ke mp3 di cloudconvert.com. Maks 18 MB.
+      </p>
+    </div>
+
+    <div class="row">
+      <label for="masalah">…atau ketik / tempel masalah &amp; transkrip manual</label>
+      <textarea id="masalah" placeholder="Contoh: Owner toko bilang harga kita lebih mahal dari kompetitor, sales kita bingung menjawab dan akhirnya gagal closing..."></textarea>
+    </div>
+    <button id="tombol" onclick="kirim()">🔎 Cari Solusi</button>
+  </div>
+
+  <div class="card" id="hasilCard">
+    <div id="hasil"></div>
+  </div>
+
+  <div class="foot">Bank Pustaka SKN · ditenagai Gemini (gratis) · Fase 1 (MVP)</div>
+</div>
+
+<script>
+  var EXEC_URL = "https://script.google.com/macros/s/AKfycbzKey-zWRADwxYY37s47-Lp8bYJO-XnisB75W70RJqZCCaYwiDlmaI4i-30brx0BZZJtg/exec";
+
+  function panggil(action, data) {
+    data = data || {};
+    data.action = action;
+    return fetch(EXEC_URL, { method: "POST", body: JSON.stringify(data) })
+      .then(function (r) { return r.json(); });
+  }
+
+  function renderRapi(t) {
+    t = String(t || "");
+    t = t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    t = t.replace(/\*(?!\s)([^*\n]+?)\*/g, '<em>$1</em>');
+    t = t.replace(/\n/g, '<br>');
+    return t;
+  }
+
+  function muatDaftarBuku() {
+    panggil("daftarBuku").then(function (res) {
+      var box = document.getElementById('pustakaBox');
+      var isi = document.getElementById('daftarBuku');
+      if (res && res.ok && res.jumlah > 0) {
+        box.querySelector('summary').textContent = '📚 ' + res.jumlah + ' buku di pustaka (klik untuk lihat)';
+        isi.innerHTML = res.judul.map(function (j) {
+          return '• ' + j.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }).join('<br>');
+      } else {
+        box.style.display = 'none';
+      }
+    }).catch(function () {
+      document.getElementById('pustakaBox').style.display = 'none';
+    });
+  }
+  muatDaftarBuku();
+
+  var solusiPanjangTerakhir = '';
+
+  function tombolRingkasHtml() {
+    return '<div style="margin-top:18px; border-top:1px dashed #e5e7eb; padding-top:16px;">'
+         + '<button id="tombolRingkas" onclick="ringkasTampil()" '
+         + 'style="background:#059669;">⚡ Ringkas jadi poin tajam</button>'
+         + '<div id="ringkasArea"></div></div>';
+  }
+
+  function ringkasTampil() {
+    if (!solusiPanjangTerakhir) return;
+    var t = document.getElementById('tombolRingkas');
+    var area = document.getElementById('ringkasArea');
+    t.disabled = true;
+    t.textContent = 'Meringkas...';
+    area.innerHTML = '<div class="loading"><div class="spinner"></div>Memadatkan jadi poin tajam...</div>';
+
+    panggil("ringkasSolusi", { jawaban: solusiPanjangTerakhir }).then(function (res) {
+      t.disabled = false; t.textContent = '⚡ Ringkas lagi';
+      if (res && res.ok) {
+        area.innerHTML = '<div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:14px; margin-top:14px;">'
+          + '<strong>⚡ Ringkasan Poin Tajam</strong><br><br>' + renderRapi(res.ringkasan) + '</div>';
+      } else {
+        area.innerHTML = '<div class="err">' + (res ? res.pesan : 'Gagal meringkas.') + '</div>';
+      }
+    }).catch(function (err) {
+      t.disabled = false; t.textContent = '⚡ Ringkas jadi poin tajam';
+      area.innerHTML = '<div class="err">Gagal meringkas: ' + err.message + '</div>';
+    });
+  }
+
+  function blokTranskrip(t) {
+    return '<div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px; margin-bottom:16px;">'
+         + '<strong>🎙️ Hasil Transkrip &amp; Analisa</strong><br><br>' + renderRapi(t) + '</div>';
+  }
+
+  function prosesAudio() {
+    var input = document.getElementById('berkas');
+    var tombol = document.getElementById('tombolAudio');
+    var kartu = document.getElementById('hasilCard');
+    var hasil = document.getElementById('hasil');
+
+    if (!input.files || !input.files.length) {
+      kartu.style.display = 'block';
+      hasil.innerHTML = '<div class="err">Pilih file rekaman dulu ya.</div>';
+      return;
+    }
+    var file = input.files[0];
+    var maxMB = 18;
+    if (file.size > maxMB * 1024 * 1024) {
+      kartu.style.display = 'block';
+      hasil.innerHTML = '<div class="err">File terlalu besar (' + (file.size / 1048576).toFixed(1)
+        + ' MB). Maksimal ' + maxMB + ' MB — pakai voice note WA atau potong rekamannya.</div>';
+      return;
+    }
+
+    tombol.disabled = true;
+    tombol.textContent = 'Mendengarkan rekaman...';
+    kartu.style.display = 'block';
+    hasil.innerHTML = '<div class="loading"><div class="spinner"></div>Gemini sedang mendengarkan &amp; mentranskrip rekaman...<br><small>(bisa 20-40 detik tergantung durasi)</small></div>';
+
+    var reader = new FileReader();
+    reader.onerror = function () {
+      tombol.disabled = false; tombol.textContent = '🎧 Transkrip & Cari Solusi';
+      hasil.innerHTML = '<div class="err">Gagal membaca file. Coba lagi.</div>';
+    };
+    reader.onload = function () {
+      var base64 = (reader.result.split(',')[1]) || '';
+      var divisi = document.getElementById('divisi').value;
+
+      panggil("transkripsiRekaman", { base64: base64, namaFile: file.name }).then(function (res) {
+        if (!res || !res.ok) {
+          tombol.disabled = false; tombol.textContent = '🎧 Transkrip & Cari Solusi';
+          hasil.innerHTML = '<div class="err">' + (res ? res.pesan : 'Gagal mentranskrip.') + '</div>';
+          return;
+        }
+        document.getElementById('masalah').value = res.transkrip;
+        hasil.innerHTML = blokTranskrip(res.transkrip)
+          + '<div class="loading"><div class="spinner"></div>Sekarang mencari solusi dari Pustaka SKN...</div>';
+        tombol.textContent = 'Mencari solusi...';
+
+        panggil("cariSolusi", { masalah: res.transkrip, divisi: divisi }).then(function (r2) {
+          tombol.disabled = false; tombol.textContent = '🎧 Transkrip & Cari Solusi';
+          if (r2 && r2.ok) {
+            solusiPanjangTerakhir = r2.jawaban;
+            hasil.innerHTML = blokTranskrip(res.transkrip)
+              + '<strong>💡 Solusi dari Pustaka SKN</strong><br><br>' + renderRapi(r2.jawaban)
+              + tombolRingkasHtml();
+          } else {
+            hasil.innerHTML = blokTranskrip(res.transkrip)
+              + '<div class="err">' + (r2 ? r2.pesan : 'Gagal cari solusi.') + '</div>';
+          }
+        }).catch(function (err) {
+          tombol.disabled = false; tombol.textContent = '🎧 Transkrip & Cari Solusi';
+          hasil.innerHTML = blokTranskrip(res.transkrip)
+            + '<div class="err">Gagal cari solusi: ' + err.message + '</div>';
+        });
+      }).catch(function (err) {
+        tombol.disabled = false; tombol.textContent = '🎧 Transkrip & Cari Solusi';
+        hasil.innerHTML = '<div class="err">Gagal memproses rekaman: ' + err.message + '</div>';
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function kirim() {
+    var masalah = document.getElementById('masalah').value;
+    var divisi = document.getElementById('divisi').value;
+    var tombol = document.getElementById('tombol');
+    var kartu = document.getElementById('hasilCard');
+    var hasil = document.getElementById('hasil');
+
+    if (!masalah || masalah.trim().length < 5) {
+      kartu.style.display = 'block';
+      hasil.innerHTML = '<div class="err">Mohon isi masalahnya dulu ya.</div>';
+      return;
+    }
+
+    tombol.disabled = true;
+    tombol.textContent = 'Sedang menganalisis...';
+    kartu.style.display = 'block';
+    hasil.innerHTML = '<div class="loading"><div class="spinner"></div>AI sedang membaca pustaka & menyusun solusi...<br><small>(bisa 10-30 detik)</small></div>';
+
+    panggil("cariSolusi", { masalah: masalah, divisi: divisi }).then(function (res) {
+      tombol.disabled = false;
+      tombol.textContent = '🔎 Cari Solusi';
+      if (res && res.ok) {
+        solusiPanjangTerakhir = res.jawaban;
+        hasil.innerHTML = renderRapi(res.jawaban) + tombolRingkasHtml();
+      } else {
+        hasil.innerHTML = '<div class="err">' + (res ? res.pesan : 'Gagal.') + '</div>';
+      }
+    }).catch(function (err) {
+      tombol.disabled = false;
+      tombol.textContent = '🔎 Cari Solusi';
+      hasil.innerHTML = '<div class="err">Terjadi kesalahan: ' + err.message + '</div>';
+    });
+  }
+</script>
+</body>
+</html>
