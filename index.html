@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bank Pustaka SKN</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   * { box-sizing: border-box; }
   body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f4f6f9; color: #1f2937; }
@@ -47,9 +48,7 @@
   <div class="card">
     <div class="row">
       <label for="divisi">Divisi</label>
-      <select id="divisi">
-        <option>Sales</option><option>HRD</option><option>Support</option><option>Lainnya</option>
-      </select>
+      <select id="divisi"><option>Sales</option><option>HRD</option><option>Support</option><option>Lainnya</option></select>
     </div>
 
     <div class="row" style="background:#f0f7ff; border:1px dashed #93c5fd; border-radius:12px; padding:14px;">
@@ -75,7 +74,41 @@
 
 <script>
   var EXEC_URL = "https://script.google.com/macros/s/AKfycbzKey-zWRADwxYY37s47-Lp8bYJO-XnisB75W70RJqZCCaYwiDlmaI4i-30brx0BZZJtg/exec";
-  var solusiPanjangTerakhir = '', masalahTerakhir = '';
+  var solusiPanjangTerakhir = '', masalahTerakhir = '', ringkasanTerakhir = '';
+
+  function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  function buatGambar() {
+    var masalahSingkat = (masalahTerakhir || '').replace(/\s+/g, ' ').trim();
+    if (masalahSingkat.length > 240) masalahSingkat = masalahSingkat.slice(0, 240) + '…';
+    var isiRingkas = (ringkasanTerakhir || '').replace(/\*\*/g, '').replace(/\*/g, '');
+    var tgl = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed; left:-9999px; top:0; width:600px; background:#fff; font-family:Segoe UI,Arial,sans-serif;';
+    wrap.innerHTML =
+      '<div style="background:#1d4ed8; color:#fff; padding:16px 20px;">'
+        + '<div style="font-size:20px; font-weight:800;">🏛️ Bank Pustaka SKN</div>'
+        + '<div style="font-size:12px; opacity:.9;">Ringkasan Solusi · ' + tgl + '</div></div>'
+      + '<div style="padding:20px;">'
+        + '<div style="font-size:12px; color:#6b7280; font-weight:700; margin-bottom:4px;">🔍 MASALAH</div>'
+        + '<div style="font-size:14px; color:#111827; margin-bottom:16px;">' + esc(masalahSingkat) + '</div>'
+        + '<div style="border-top:1px solid #e5e7eb; padding-top:14px; font-size:14px; color:#111827; line-height:1.7; white-space:pre-wrap;">' + esc(isiRingkas) + '</div>'
+      + '</div>'
+      + '<div style="background:#f3f4f6; color:#9ca3af; font-size:11px; padding:8px 20px; text-align:center;">PT Satelit Komunika Nusantara — internal</div>';
+    document.body.appendChild(wrap);
+
+    html2canvas(wrap, { scale: 2, backgroundColor: '#ffffff' }).then(function (canvas) {
+      document.body.removeChild(wrap);
+      var link = document.createElement('a');
+      link.download = 'Ringkasan-Bank-Pustaka-SKN.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }).catch(function (err) {
+      if (wrap.parentNode) document.body.removeChild(wrap);
+      alert('Gagal membuat gambar: ' + err.message);
+    });
+  }
 
   function panggil(action, data) {
     data = data || {}; data.action = action;
@@ -131,36 +164,51 @@
     return '<div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px; margin-bottom:16px;">'
          + '<strong>🎙️ Hasil Transkrip &amp; Analisa</strong><br><br>' + renderRapi(t) + '</div>';
   }
-  function tombolRingkasHtml() {
-    return '<div style="margin-top:18px; border-top:1px dashed #e5e7eb; padding-top:16px;">'
-         + '<button id="tombolRingkas" onclick="ringkasTampil()" style="background:#059669;">⚡ Ringkas jadi poin tajam</button>'
-         + '<div id="ringkasArea"></div></div>';
-  }
   function kotakMasukanHtml() {
     return '<div style="margin-top:18px; border-top:1px dashed #e5e7eb; padding-top:16px;">'
       + '<strong>➕ Tambah solusi dari ASM &amp; Tim Support</strong>'
-      + '<p style="font-size:13px;color:#6b7280;margin:4px 0 10px;">Solusi/pengalaman kamu disimpan &amp; dipakai AI untuk memperkaya jawaban berikutnya.</p>'
+      + '<p style="font-size:13px;color:#6b7280;margin:4px 0 10px;">Isi solusi/pengalaman kamu di sini DULU. Selain tersimpan &amp; dipakai AI ke depan, ini juga ikut masuk ke Ringkasan Akhir di bawah.</p>'
       + '<input type="text" id="mNama" placeholder="Nama kamu" style="margin-bottom:8px;">'
       + '<select id="mPeran" style="margin-bottom:8px;"><option>ASM</option><option>Tim Support</option><option>Sales</option><option>Lainnya</option></select>'
-      + '<textarea id="mSolusi" placeholder="Tulis solusi / pengalaman nyata kamu untuk masalah ini..." style="min-height:90px; margin-bottom:8px;"></textarea>'
+      + '<textarea id="mSolusi" placeholder="Tulis solusi atau pengalaman nyata kamu untuk masalah ini..." style="min-height:90px; margin-bottom:8px;"></textarea>'
       + '<button onclick="kirimMasukan()" style="background:#7c3aed;">💾 Simpan Solusi Saya</button>'
       + '<div id="mStatus"></div></div>';
   }
+  function tombolRingkasHtml() {
+    return '<div style="margin-top:18px; border-top:2px solid #d1fae5; padding-top:16px;">'
+      + '<p style="font-size:13px;color:#6b7280;margin:0 0 8px;">Klik untuk RINGKASAN AKHIR yang menggabungkan: solusi buku + analisa AI + masukan ASM/Support di atas.</p>'
+      + '<button id="tombolRingkas" onclick="ringkasTampil()" style="background:#059669;">🎯 Ringkasan Akhir (buku + AI + masukan tim)</button>'
+      + '<div id="ringkasArea"></div></div>';
+  }
   function tampilSolusiFinal(headerHtml, jawaban) {
     solusiPanjangTerakhir = jawaban;
-    document.getElementById('hasil').innerHTML = headerHtml + renderRapi(jawaban) + tombolRingkasHtml() + kotakMasukanHtml();
+    document.getElementById('hasil').innerHTML = headerHtml + renderRapi(jawaban) + kotakMasukanHtml() + tombolRingkasHtml();
   }
 
   function ringkasTampil() {
     if (!solusiPanjangTerakhir) return;
     var t = document.getElementById('tombolRingkas'), area = document.getElementById('ringkasArea');
-    t.disabled = true; t.textContent = 'Meringkas...';
-    area.innerHTML = '<div class="loading"><div class="spinner"></div>Memadatkan jadi poin tajam...</div>';
-    panggil("ringkasSolusi", { jawaban: solusiPanjangTerakhir }).then(function (res) {
-      t.disabled = false; t.textContent = '⚡ Ringkas lagi';
-      if (res && res.ok) area.innerHTML = '<div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:14px; margin-top:14px;"><strong>⚡ Ringkasan Poin Tajam</strong><br><br>' + renderRapi(res.ringkasan) + '</div>';
-      else area.innerHTML = '<div class="err">' + (res ? res.pesan : 'Gagal meringkas.') + '</div>';
-    }).catch(function (err) { t.disabled = false; t.textContent = '⚡ Ringkas jadi poin tajam'; area.innerHTML = '<div class="err">Gagal meringkas: ' + err.message + '</div>'; });
+    var hNama = (document.getElementById('mNama') || {}).value || '';
+    var hPeran = (document.getElementById('mPeran') || {}).value || '';
+    var hSolusi = (document.getElementById('mSolusi') || {}).value || '';
+    var gabungan = solusiPanjangTerakhir;
+    if (hSolusi.trim().length >= 3) {
+      gabungan += "\n\n=== TAMBAHAN SOLUSI DARI " + (hPeran || 'Tim') + (hNama ? ' (' + hNama + ')' : '') + " ===\n" + hSolusi;
+    }
+    t.disabled = true; t.textContent = 'Menyusun ringkasan akhir...';
+    area.innerHTML = '<div class="loading"><div class="spinner"></div>Menggabungkan buku + analisa AI + masukan tim jadi ringkasan akhir...</div>';
+    panggil("ringkasSolusi", { jawaban: gabungan }).then(function (res) {
+      t.disabled = false; t.textContent = '🎯 Ringkasan Akhir lagi';
+      if (res && res.ok) {
+        ringkasanTerakhir = res.ringkasan;
+        area.innerHTML = '<div style="background:#ecfdf5; border:2px solid #6ee7b7; border-radius:10px; padding:14px; margin-top:14px;">'
+          + '<strong>🎯 Ringkasan Akhir (buku + AI + masukan tim)</strong><br><br>' + renderRapi(res.ringkasan) + '</div>'
+          + '<button onclick="buatGambar()" style="background:#0ea5e9; margin-top:12px;">📥 Download Gambar Ringkasan</button>';
+      } else { area.innerHTML = '<div class="err">' + (res ? res.pesan : 'Gagal.') + '</div>'; }
+    }).catch(function (err) {
+      t.disabled = false; t.textContent = '🎯 Ringkasan Akhir (buku + AI + masukan tim)';
+      area.innerHTML = '<div class="err">Gagal: ' + err.message + '</div>';
+    });
   }
 
   function kirimMasukan() {
@@ -168,7 +216,7 @@
     if (!solusi || solusi.trim().length < 5) { status.innerHTML = '<div class="err" style="margin-top:8px">Isi solusinya dulu ya (min. 5 huruf).</div>'; return; }
     status.innerHTML = '<div class="loading"><div class="spinner"></div>Menyimpan...</div>';
     panggil("simpanMasukan", { nama: nama, peran: peran, masalah: masalahTerakhir, solusi: solusi }).then(function (res) {
-      if (res && res.ok) { status.innerHTML = '<div style="margin-top:8px;color:#059669;font-weight:600">✅ Tersimpan! Terima kasih — akan dipakai AI ke depannya.</div>'; document.getElementById('mSolusi').value = ''; }
+      if (res && res.ok) { status.innerHTML = '<div style="margin-top:8px;color:#059669;font-weight:600">✅ Tersimpan! Terima kasih — akan dipakai AI ke depannya. (Solusi ini juga ikut ke Ringkasan Akhir.)</div>'; }
       else status.innerHTML = '<div class="err" style="margin-top:8px">' + (res ? res.pesan : 'Gagal simpan.') + '</div>';
     }).catch(function (err) { status.innerHTML = '<div class="err" style="margin-top:8px">Gagal: ' + err.message + '</div>'; });
   }
