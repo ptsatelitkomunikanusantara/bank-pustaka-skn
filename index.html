@@ -79,23 +79,31 @@
   function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
   function buatGambar() {
-    var masalahSingkat = (masalahTerakhir || '').replace(/\s+/g, ' ').trim();
-    if (masalahSingkat.length > 240) masalahSingkat = masalahSingkat.slice(0, 240) + '…';
-    var isiRingkas = (ringkasanTerakhir || '').replace(/\*\*/g, '').replace(/\*/g, '');
+    var teks = (ringkasanTerakhir || '').replace(/\*\*/g, '').replace(/\*/g, '').trim();
+    if (!teks) { alert('Klik "Ringkasan Akhir" dulu ya, baru download gambarnya.'); return; }
     var tgl = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    var body = '';
+    teks.split('\n').forEach(function (ln) {
+      var s = ln.trim();
+      if (!s) { body += '<div style="height:6px;"></div>'; return; }
+      if (/^(🎯|✅|💬|🔍|📚|🧠|📌|💡)/.test(s)) {
+        body += '<div style="font-weight:800; color:#1d4ed8; font-size:15px; margin:16px 0 6px;">' + esc(s) + '</div>';
+      } else {
+        body += '<div style="font-size:14px; color:#1f2937; line-height:1.65; margin-bottom:5px;">' + esc(s) + '</div>';
+      }
+    });
+
     var wrap = document.createElement('div');
-    wrap.style.cssText = 'position:fixed; left:-9999px; top:0; width:600px; background:#fff; font-family:Segoe UI,Arial,sans-serif;';
+    wrap.style.cssText = 'position:fixed; left:-9999px; top:0; width:640px; background:#fff; font-family:Segoe UI,Arial,sans-serif;';
     wrap.innerHTML =
-      '<div style="background:#1d4ed8; color:#fff; padding:16px 20px;">'
-        + '<div style="font-size:20px; font-weight:800;">🏛️ Bank Pustaka SKN</div>'
-        + '<div style="font-size:12px; opacity:.9;">Ringkasan Solusi · ' + tgl + '</div></div>'
-      + '<div style="padding:20px;">'
-        + '<div style="font-size:12px; color:#6b7280; font-weight:700; margin-bottom:4px;">🔍 MASALAH</div>'
-        + '<div style="font-size:14px; color:#111827; margin-bottom:16px;">' + esc(masalahSingkat) + '</div>'
-        + '<div style="border-top:1px solid #e5e7eb; padding-top:14px; font-size:14px; color:#111827; line-height:1.7; white-space:pre-wrap;">' + esc(isiRingkas) + '</div>'
-      + '</div>'
-      + '<div style="background:#f3f4f6; color:#9ca3af; font-size:11px; padding:8px 20px; text-align:center;">PT Satelit Komunika Nusantara — internal</div>';
+      '<div style="background:#1d4ed8; color:#fff; padding:18px 24px;">'
+        + '<div style="font-size:21px; font-weight:800;">🏛️ Bank Pustaka SKN</div>'
+        + '<div style="font-size:12px; opacity:.9; margin-top:2px;">Ringkasan Solusi (buku + AI + masukan tim) · ' + tgl + '</div></div>'
+      + '<div style="padding:22px 24px;">' + body + '</div>'
+      + '<div style="background:#f3f4f6; color:#9ca3af; font-size:11px; padding:10px 24px; text-align:center;">PT Satelit Komunika Nusantara — internal</div>';
     document.body.appendChild(wrap);
+
     html2canvas(wrap, { scale: 2, backgroundColor: '#ffffff' }).then(function (canvas) {
       document.body.removeChild(wrap);
       var link = document.createElement('a');
