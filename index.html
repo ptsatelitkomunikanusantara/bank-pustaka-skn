@@ -83,7 +83,6 @@
     if (masalahSingkat.length > 240) masalahSingkat = masalahSingkat.slice(0, 240) + '…';
     var isiRingkas = (ringkasanTerakhir || '').replace(/\*\*/g, '').replace(/\*/g, '');
     var tgl = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-
     var wrap = document.createElement('div');
     wrap.style.cssText = 'position:fixed; left:-9999px; top:0; width:600px; background:#fff; font-family:Segoe UI,Arial,sans-serif;';
     wrap.innerHTML =
@@ -97,7 +96,6 @@
       + '</div>'
       + '<div style="background:#f3f4f6; color:#9ca3af; font-size:11px; padding:8px 20px; text-align:center;">PT Satelit Komunika Nusantara — internal</div>';
     document.body.appendChild(wrap);
-
     html2canvas(wrap, { scale: 2, backgroundColor: '#ffffff' }).then(function (canvas) {
       document.body.removeChild(wrap);
       var link = document.createElement('a');
