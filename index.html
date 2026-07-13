@@ -52,12 +52,16 @@
     </div>
 
     <div class="row" style="background:#f0f7ff; border:1px dashed #93c5fd; border-radius:12px; padding:14px;">
+      <label for="bahasaKamus">🗣️ Bahasa daerah rekaman (pakai kamus untuk terjemahan akurat)</label>
+      <select id="bahasaKamus" style="margin-bottom:12px;">
+        <option value="">Deteksi otomatis (pakai semua kamus)</option>
+      </select>
       <label for="berkas">📎 Lampirkan file — bisa BANYAK sekaligus (rekaman / foto / PDF / Excel)</label>
-      <input type="file" id="berkas" multiple accept="audio/*,image/*,.pdf,.xlsx,.xls,.csv,.opus,.ogg,.oga,.m4a,.mp3,.mpeg,.mpga,.wav,.flac">
+      <input type="file" id="berkas" multiple accept="audio/*,image/*,.pdf,.xlsx,.xls,.csv,.opus,.ogg,.oga,.m4a,.mp3,.wav,.flac">
       <button id="tombolAudio" onclick="prosesFile()" style="margin-top:12px;">🎧 Proses Semua File</button>
       <p style="font-size:13px; color:#6b7280; margin:10px 0 0;">
         Bisa pilih beberapa file sekaligus (tahan <b>Ctrl</b> saat memilih). Campur boleh: rekaman + foto + PDF + Excel.
-        <b>Tiap file dapat hasil analisa sendiri.</b> Rekaman (voice note WA .opus/.ogg, mp3, mpeg, m4a, wav) · Foto (jpg/png) · PDF · Excel. Maks 18 MB/file. File .amr convert dulu ke mp3.
+        <b>Tiap file dapat hasil analisa sendiri.</b> Rekaman (voice note WA .opus/.ogg, mp3, m4a, wav) · Foto (jpg/png) · PDF · Excel. Maks 18 MB/file. File .amr convert dulu ke mp3.
       </p>
     </div>
 
@@ -69,12 +73,22 @@
   </div>
 
   <div class="card" id="hasilCard"><div id="hasil"></div></div>
+
+  <div class="card" style="border:2px solid #c7d2fe;">
+    <div class="row">
+      <label for="tanyaArsip">🔎 Tanya Arsip Rekaman <span style="font-weight:400; color:#6b7280;">(tanya isi semua rekaman yang pernah ditranskrip)</span></label>
+      <textarea id="tanyaArsip" style="min-height:80px;" placeholder="Contoh: Toko mana saja yang komplain barang telat? Sales siapa yang janji kirim barang? Dealer mana yang minta tambah stok?"></textarea>
+    </div>
+    <button id="tombolTanya" onclick="tanyaArsip()" style="background:#4f46e5;">🔎 Tanya ke Arsip Rekaman</button>
+    <div id="hasilArsip"></div>
+  </div>
+
   <div class="foot">Asisten Solusi SKN · ditenagai Gemini · analisa buku + AI + masukan ASM/Support</div>
 </div>
 
 <script>
   var EXEC_URL = "https://script.google.com/macros/s/AKfycbzKey-zWRADwxYY37s47-Lp8bYJO-XnisB75W70RJqZCCaYwiDlmaI4i-30brx0BZZJtg/exec";
-  var hasilList = [];
+  var hasilList = [];   // tiap file = 1 hasil { namaFile, transkrip, masalah, jawaban, ringkasan }
 
   function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   function panggil(action, data) {
@@ -116,7 +130,11 @@
   }
   function blokTranskrip(t) {
     return '<div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px; margin-bottom:16px;">'
-         + '<strong>🎙️ Hasil Transkrip &amp; Analisa</strong><br><br>' + renderRapi(t) + '</div>';
+         + '<strong>🎙️ Hasil Transkrip, Terjemahan &amp; Analisa</strong><br><br>' + renderRapi(t) + '</div>';
+  }
+  function blokAlert(a) {
+    return '<div style="background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:14px; margin-bottom:16px;">'
+         + '<strong>🚨 Perlu Ditindaklanjuti</strong><br><br>' + renderRapi(a) + '</div>';
   }
 
   function muatDaftarBuku() {
@@ -130,6 +148,19 @@
   }
   muatDaftarBuku();
 
+  // isi dropdown bahasa dari kamus yang sudah diproses
+  function muatBahasaKamus() {
+    panggil("daftarBahasaKamus").then(function (res) {
+      if (!res || !res.ok || !res.bahasa || !res.bahasa.length) return;
+      var sel = document.getElementById('bahasaKamus');
+      res.bahasa.forEach(function (b) {
+        var o = document.createElement('option'); o.value = b; o.textContent = b; sel.appendChild(o);
+      });
+    }).catch(function () {});
+  }
+  muatBahasaKamus();
+
+  // ====== KARTU HASIL PER FILE (pakai index i) ======
   function kotakMasukanHtml(i) {
     return '<div style="margin-top:18px; border-top:1px dashed #e5e7eb; padding-top:16px;">'
       + '<strong>➕ Tambah solusi dari ASM &amp; Tim Support</strong>'
@@ -150,6 +181,7 @@
     var h = hasilList[i];
     var out = '<div style="border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:20px; background:#fff;">';
     out += '<div style="font-weight:800; color:#1d4ed8; font-size:16px; margin-bottom:12px;">📄 ' + esc(h.namaFile) + '</div>';
+    if (h.alert && String(h.alert).trim()) out += blokAlert(h.alert);
     if (h.transkrip) out += blokTranskrip(h.transkrip);
     out += '<strong>💡 Solusi &amp; Analisa</strong><br><br><div style="white-space:pre-wrap;">' + renderRapi(h.jawaban) + '</div>';
     out += kotakMasukanHtml(i) + tombolRingkasHtml(i);
@@ -221,17 +253,18 @@
     }).catch(function (err) { if (wrap.parentNode) document.body.removeChild(wrap); alert('Gagal membuat gambar: ' + err.message); });
   }
 
-  function prosesSatuFile(file, divisi) {
+  // ====== PROSES 1 FILE → kembalikan objek hasil ======
+  function prosesSatuFile(file, divisi, bahasa) {
     if (file.size > 18 * 1024 * 1024) return Promise.reject(new Error('file terlalu besar (' + (file.size / 1048576).toFixed(1) + ' MB, maks 18 MB)'));
     var jenis = jenisFile(file.name);
     if (jenis === 'audio') {
       return bacaBase64(file).then(function (b64) {
-        return panggil("transkripsiRekaman", { base64: b64, namaFile: file.name });
+        return panggil("transkripsiRekaman", { base64: b64, namaFile: file.name, bahasa: bahasa || '' });
       }).then(function (t) {
         if (!t || !t.ok) throw new Error(t ? t.pesan : 'gagal transkrip');
         return panggil("cariSolusi", { masalah: t.transkrip, divisi: divisi }).then(function (s) {
           if (!s || !s.ok) throw new Error(s ? s.pesan : 'gagal cari solusi');
-          return { namaFile: file.name, transkrip: t.transkrip, masalah: t.transkrip, jawaban: s.jawaban, ringkasan: '' };
+          return { namaFile: file.name, transkrip: t.transkrip, alert: t.alert || '', masalah: t.transkrip, jawaban: s.jawaban, ringkasan: '' };
         });
       });
     } else if (jenis === 'gambar' || jenis === 'pdf') {
@@ -255,6 +288,7 @@
     }
   }
 
+  // ====== PROSES BANYAK FILE (satu per satu) ======
   async function prosesFile() {
     var input = document.getElementById('berkas');
     var kartu = document.getElementById('hasilCard');
@@ -263,6 +297,7 @@
     if (!input.files || !input.files.length) { kartu.style.display = 'block'; hasil.innerHTML = '<div class="err">Pilih file dulu ya (boleh banyak sekaligus).</div>'; return; }
     var files = Array.prototype.slice.call(input.files);
     var divisi = document.getElementById('divisi').value;
+    var bahasa = document.getElementById('bahasaKamus').value;
 
     hasilList = [];
     kartu.style.display = 'block';
@@ -276,7 +311,7 @@
       tombol.textContent = 'Memproses ' + (i + 1) + '/' + files.length + '...';
       progres.innerHTML = loadingHtml('Memproses file ' + (i + 1) + ' dari ' + files.length + ':<br><b>' + esc(f.name) + '</b><br><small>(20-60 detik/file)</small>');
       try {
-        var data = await prosesSatuFile(f, divisi);
+        var data = await prosesSatuFile(f, divisi, bahasa);
         var idx = hasilList.length;
         hasilList.push(data);
         kontainer.insertAdjacentHTML('beforeend', kartuHasilHtml(idx));
@@ -289,6 +324,24 @@
     tombol.disabled = false; tombol.textContent = '🎧 Proses Semua File';
   }
 
+  // ====== TANYA ARSIP REKAMAN (ala NotebookLM atas rekaman sales) ======
+  function tanyaArsip() {
+    var q = document.getElementById('tanyaArsip').value;
+    var tombol = document.getElementById('tombolTanya');
+    var area = document.getElementById('hasilArsip');
+    if (!q || q.trim().length < 3) { area.innerHTML = '<div class="err" style="margin-top:14px;">Ketik dulu pertanyaannya ya.</div>'; return; }
+    tombol.disabled = true; tombol.textContent = 'Mencari di arsip...';
+    area.innerHTML = loadingHtml('Membaca arsip rekaman &amp; menyusun jawaban...');
+    panggil("tanyaRekaman", { pertanyaan: q }).then(function (res) {
+      tombol.disabled = false; tombol.textContent = '🔎 Tanya ke Arsip Rekaman';
+      if (res && res.ok) {
+        area.innerHTML = '<div style="background:#eef2ff; border:1px solid #c7d2fe; border-radius:10px; padding:14px; margin-top:14px;">'
+          + '<strong>💬 Jawaban dari ' + res.jumlahRekaman + ' rekaman terbaru</strong><br><br>' + renderRapi(res.jawaban) + '</div>';
+      } else { area.innerHTML = '<div class="err" style="margin-top:14px;">' + (res ? res.pesan : 'Gagal menjawab.') + '</div>'; }
+    }).catch(function (err) { tombol.disabled = false; tombol.textContent = '🔎 Tanya ke Arsip Rekaman'; area.innerHTML = '<div class="err" style="margin-top:14px;">Terjadi kesalahan: ' + err.message + '</div>'; });
+  }
+
+  // ====== MASALAH MANUAL (teks, 1 hasil) ======
   function kirim() {
     var masalah = document.getElementById('masalah').value, divisi = document.getElementById('divisi').value, tombol = document.getElementById('tombol'), kartu = document.getElementById('hasilCard'), hasil = document.getElementById('hasil');
     if (!masalah || masalah.trim().length < 5) { kartu.style.display = 'block'; hasil.innerHTML = '<div class="err">Mohon isi masalahnya dulu (atau pakai "Proses Semua File" untuk lampiran).</div>'; return; }
