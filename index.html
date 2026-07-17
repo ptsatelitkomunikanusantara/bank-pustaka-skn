@@ -259,7 +259,7 @@
     var jenis = jenisFile(file.name);
     if (jenis === 'audio') {
       return bacaBase64(file).then(function (b64) {
-        return panggil("transkripsiRekaman", { base64: b64, namaFile: file.name, bahasa: bahasa || '' });
+        return panggil("transkripsiRekaman", { base64: b64, namaFile: file.name, bahasa: bahasa, divisi: divisi || '' });
       }).then(function (t) {
         if (!t || !t.ok) throw new Error(t ? t.pesan : 'gagal transkrip');
         return panggil("cariSolusi", { masalah: t.transkrip, divisi: divisi }).then(function (s) {
