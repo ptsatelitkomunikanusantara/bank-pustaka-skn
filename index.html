@@ -68,6 +68,37 @@
     </div>
   </details>
 
+  <details class="pustaka" id="dataBox" style="background:#f0fdf4; border-color:#bbf7d0;">
+    <summary style="color:#15803d;">📦 Data Pendukung <span style="font-weight:400;color:#166534;">(Stock WIN, Pricelist, Stock Toko)</span></summary>
+    <div class="isi">
+      <p style="margin:6px 0 12px; color:#6b7280; font-size:13px;">Upload/tempel data <b>Stock WIN, Pricelist, atau Stock Toko</b>. Dipakai AI untuk cek apakah sales menawarkan barang yang ADA &amp; harga yang BENAR. Sumber boleh <b>foto</b>, <b>file Excel</b>, atau <b>ketik langsung</b>.</p>
+      <div class="row">
+        <label for="dpKategori">Jenis data</label>
+        <select id="dpKategori" onchange="dpToggleToko()">
+          <option value="Stock WIN">Stock WIN (stok kita)</option>
+          <option value="Pricelist">Pricelist (daftar harga)</option>
+          <option value="Stock Toko">Stock Toko (stok dealer)</option>
+        </select>
+      </div>
+      <div class="row" id="dpTokoRow" style="display:none;">
+        <label for="dpToko">Nama Toko / Dealer</label>
+        <input type="text" id="dpToko" list="dpTokoList" placeholder="mis. Toko Berkah Medan">
+        <datalist id="dpTokoList"></datalist>
+      </div>
+      <div class="row">
+        <label for="dpFile">Upload foto / Excel <span style="font-weight:400;color:#6b7280;">(atau ketik di bawah)</span></label>
+        <input type="file" id="dpFile" accept="image/*,.xlsx,.xls,.csv">
+      </div>
+      <div class="row">
+        <label for="dpTeks">…atau ketik / tempel data manual</label>
+        <textarea id="dpTeks" style="min-height:90px;" placeholder="Contoh:&#10;Infinix Hot 50 | Stok: 20 | Rp 1.599.000&#10;Itel A70 | Stok: 5 | Rp 999.000"></textarea>
+      </div>
+      <button onclick="simpanDataUI()" style="background:#16a34a;">💾 Simpan Data Pendukung</button>
+      <div id="dpStatus"></div>
+      <div id="dpRingkas" style="margin-top:14px;"></div>
+    </div>
+  </details>
+
   <div class="card">
     <div class="row">
       <label for="divisi">Divisi</label>
@@ -229,6 +260,71 @@
         status.innerHTML = '<div style="margin-top:10px;color:#059669;font-weight:600">✅ ' + esc(res.pesan) + '</div>';
         document.getElementById('brPoin').value = '';
         muatSalesArea(); muatBriefingTerbaru();
+      } else { status.innerHTML = '<div class="err" style="margin-top:10px;">' + (res ? esc(res.pesan) : 'Gagal.') + '</div>'; }
+    }).catch(function (err) { status.innerHTML = '<div class="err" style="margin-top:10px;">Gagal: ' + esc(err.message) + '</div>'; });
+  }
+
+  // ====== DATA PENDUKUNG (Fase A-2) ======
+  function dpToggleToko() {
+    var kat = (document.getElementById('dpKategori') || {}).value || '';
+    var row = document.getElementById('dpTokoRow');
+    if (row) row.style.display = (kat.toLowerCase().indexOf('toko') >= 0) ? 'block' : 'none';
+  }
+
+  function muatRingkasData() {
+    panggil("ringkasDataPendukung").then(function (res) {
+      var area = document.getElementById('dpRingkas');
+      var dl = document.getElementById('dpTokoList');
+      if (!area) return;
+      if (!res || !res.ok) { area.innerHTML = ''; return; }
+      var h = '<strong style="font-size:13px;">📋 Data tersimpan:</strong><br>'
+            + (res.adaStockWin ? '✅' : '⬜') + ' Stock WIN &nbsp; '
+            + (res.adaPricelist ? '✅' : '⬜') + ' Pricelist';
+      if (res.tokoStok && res.tokoStok.length) h += '<br>🏪 Stok toko: ' + res.tokoStok.map(esc).join(', ');
+      area.innerHTML = '<div style="font-size:13px;color:#374151;">' + h + '</div>';
+      if (dl && res.tokoStok) { dl.innerHTML = ''; res.tokoStok.forEach(function (t) { var o = document.createElement('option'); o.value = t; dl.appendChild(o); }); }
+    }).catch(function () {});
+  }
+  muatRingkasData();
+
+  function simpanDataUI() {
+    var kat = (document.getElementById('dpKategori') || {}).value || '';
+    var toko = (document.getElementById('dpToko') || {}).value || '';
+    var teks = (document.getElementById('dpTeks') || {}).value || '';
+    var fileEl = document.getElementById('dpFile');
+    var status = document.getElementById('dpStatus');
+    var file = fileEl && fileEl.files && fileEl.files[0];
+    if (kat.toLowerCase().indexOf('toko') >= 0 && !toko.trim()) { status.innerHTML = '<div class="err" style="margin-top:10px;">Isi nama toko dulu ya.</div>'; return; }
+    if (!file && teks.trim().length < 3) { status.innerHTML = '<div class="err" style="margin-top:10px;">Upload foto/Excel atau ketik datanya dulu.</div>'; return; }
+
+    function simpanTeks(t) { return panggil("simpanDataPendukung", { kategori: kat, label: toko, isiTeks: t }); }
+    status.innerHTML = loadingHtml('Menyiapkan data...');
+
+    var siapkan;
+    if (file) {
+      var jenis = jenisFile(file.name);
+      if (jenis === 'gambar') {
+        siapkan = bacaBase64(file).then(function (b64) {
+          status.innerHTML = loadingHtml('AI membaca isi gambar...');
+          return panggil("ekstrakDataDariGambar", { base64: b64, mime: mimeGambar(file.name, file.type), kategori: kat }).then(function (r) {
+            if (!r || !r.ok) throw new Error(r ? r.pesan : 'gagal baca gambar');
+            return r.teks;
+          });
+        });
+      } else if (jenis === 'excel') {
+        siapkan = bacaExcel(file).then(function (t) { return 'DATA EXCEL (' + file.name + '):\n' + t; });
+      } else {
+        status.innerHTML = '<div class="err" style="margin-top:10px;">File harus foto atau Excel.</div>'; return;
+      }
+    } else {
+      siapkan = Promise.resolve(teks);
+    }
+
+    siapkan.then(simpanTeks).then(function (res) {
+      if (res && res.ok) {
+        status.innerHTML = '<div style="margin-top:10px;color:#059669;font-weight:600">✅ ' + esc(res.pesan) + '</div>';
+        document.getElementById('dpTeks').value = ''; if (fileEl) fileEl.value = '';
+        muatRingkasData();
       } else { status.innerHTML = '<div class="err" style="margin-top:10px;">' + (res ? esc(res.pesan) : 'Gagal.') + '</div>'; }
     }).catch(function (err) { status.innerHTML = '<div class="err" style="margin-top:10px;">Gagal: ' + esc(err.message) + '</div>'; });
   }
