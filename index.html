@@ -48,19 +48,19 @@
   <details class="pustaka" id="briefingBox" style="background:#fff7ed; border-color:#fed7aa;">
     <summary style="color:#c2410c;">📋 Input Briefing Leader <span style="font-weight:400;color:#9a3412;">(panduan menilai kerja sales)</span></summary>
     <div class="isi">
-      <p style="margin:6px 0 12px; color:#6b7280; font-size:13px;">Leader isi poin briefing harian <b>per sales / area</b>. Nanti dipakai AI untuk mengecek apakah sales menjalankan poin briefing saat rekamannya dianalisa.</p>
+      <p style="margin:6px 0 12px; color:#6b7280; font-size:13px;">Tempel <b>notulensi hasil ZOOM briefing dengan leader</b> (per tanggal). Nanti dipakai AI untuk mengecek apakah sales menjalankan poin briefing dari leader saat rekamannya dianalisa.</p>
       <div class="row">
         <label for="brTanggal">Tanggal briefing</label>
         <input type="date" id="brTanggal">
       </div>
       <div class="row">
-        <label for="brSales">Sales / Area</label>
-        <input type="text" id="brSales" list="brSalesList" placeholder="mis. Andi - Medan Kota">
+        <label for="brSales">Nama Leader</label>
+        <input type="text" id="brSales" list="brSalesList" placeholder="mis. Pak Budi (leader area Medan)">
         <datalist id="brSalesList"></datalist>
       </div>
       <div class="row">
-        <label for="brPoin">Poin briefing hari ini</label>
-        <textarea id="brPoin" placeholder="Contoh:&#10;1. Tawarkan Infinix Hot 50 ke tiap toko&#10;2. Tagih pembayaran dealer yang jatuh tempo&#10;3. Data stok toko yang kosong lalu laporkan"></textarea>
+        <label for="brPoin">Notulensi briefing (tempel hasil Zoom)</label>
+        <textarea id="brPoin" placeholder="Tempel notulensi Zoom briefing dengan leader di sini...&#10;Contoh poin:&#10;1. Tawarkan Infinix Hot 50 ke tiap toko&#10;2. Tagih pembayaran dealer yang jatuh tempo&#10;3. Data stok toko yang kosong lalu laporkan"></textarea>
       </div>
       <button onclick="simpanBriefingUI()" style="background:#ea580c;">💾 Simpan Briefing</button>
       <div id="brStatus"></div>
