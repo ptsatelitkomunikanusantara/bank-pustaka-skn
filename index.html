@@ -105,6 +105,26 @@
       <select id="divisi"><option>Tim Penjualan</option><option>Tim Support</option><option>Promotor</option></select>
     </div>
 
+    <div class="row" style="background:#fefce8; border:1px dashed #fde047; border-radius:12px; padding:14px;">
+      <label style="margin-bottom:8px;">🎯 Konteks penilaian <span style="font-weight:400; color:#6b7280;">(opsional — agar AI cek pelaksanaan briefing & kesesuaian stok/harga)</span></label>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:150px;">
+          <label for="fbLeader" style="font-size:12px; font-weight:400; margin-bottom:4px;">Nama Leader</label>
+          <input type="text" id="fbLeader" list="fbLeaderList" placeholder="pilih leader">
+          <datalist id="fbLeaderList"></datalist>
+        </div>
+        <div style="flex:1; min-width:120px;">
+          <label for="fbTanggal" style="font-size:12px; font-weight:400; margin-bottom:4px;">Tanggal rekaman</label>
+          <input type="date" id="fbTanggal">
+        </div>
+        <div style="flex:1; min-width:150px;">
+          <label for="fbToko" style="font-size:12px; font-weight:400; margin-bottom:4px;">Nama Toko</label>
+          <input type="text" id="fbToko" list="fbTokoList" placeholder="pilih toko">
+          <datalist id="fbTokoList"></datalist>
+        </div>
+      </div>
+    </div>
+
     <div class="row" style="background:#f0f7ff; border:1px dashed #93c5fd; border-radius:12px; padding:14px;">
       <label for="bahasaKamus">🗣️ Bahasa daerah rekaman (pakai kamus untuk terjemahan akurat)</label>
       <select id="bahasaKamus" style="margin-bottom:12px;">
@@ -329,6 +349,30 @@
     }).catch(function (err) { status.innerHTML = '<div class="err" style="margin-top:10px;">Gagal: ' + esc(err.message) + '</div>'; });
   }
 
+  // ====== KONTEKS PENILAIAN (Fase B) — leader/tanggal/toko utk cek briefing & stok ======
+  (function initFbTanggal() {
+    var el = document.getElementById('fbTanggal');
+    if (el) { var d = new Date(); el.value = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  })();
+  function isiDatalist(id, arr) {
+    var dl = document.getElementById(id);
+    if (!dl || !arr) return;
+    dl.innerHTML = '';
+    arr.forEach(function (v) { var o = document.createElement('option'); o.value = v; dl.appendChild(o); });
+  }
+  function muatKonteksDropdown() {
+    panggil("daftarSalesArea").then(function (res) { if (res && res.ok) isiDatalist('fbLeaderList', res.daftar); }).catch(function () {});
+    panggil("daftarTokoStok").then(function (res) { if (res && res.ok) isiDatalist('fbTokoList', res.daftar); }).catch(function () {});
+  }
+  muatKonteksDropdown();
+  function konteksLapangan() {
+    return {
+      leader: (document.getElementById('fbLeader') || {}).value || '',
+      tanggal: (document.getElementById('fbTanggal') || {}).value || '',
+      namaToko: (document.getElementById('fbToko') || {}).value || ''
+    };
+  }
+
   // ====== KARTU HASIL PER FILE (pakai index i) ======
   function kotakMasukanHtml(i) {
     return '<div style="margin-top:18px; border-top:1px dashed #e5e7eb; padding-top:16px;">'
@@ -431,7 +475,7 @@
         return panggil("transkripsiRekaman", { base64: b64, namaFile: file.name, bahasa: bahasa || '' });
       }).then(function (t) {
         if (!t || !t.ok) throw new Error(t ? t.pesan : 'gagal transkrip');
-        return panggil("cariSolusi", { masalah: t.transkrip, divisi: divisi }).then(function (s) {
+        return panggil("cariSolusi", { masalah: t.transkrip, divisi: divisi, konteks: konteksLapangan() }).then(function (s) {
           if (!s || !s.ok) throw new Error(s ? s.pesan : 'gagal cari solusi');
           return { namaFile: file.name, transkrip: t.transkrip, alert: t.alert || '', masalah: t.transkrip, jawaban: s.jawaban, ringkasan: '' };
         });
@@ -439,7 +483,7 @@
     } else if (jenis === 'gambar' || jenis === 'pdf') {
       return bacaBase64(file).then(function (b64) {
         var mime = (jenis === 'pdf') ? 'application/pdf' : mimeGambar(file.name, file.type);
-        return panggil("cariSolusi", { masalah: '', divisi: divisi, lampiran: { mime: mime, base64: b64 } });
+        return panggil("cariSolusi", { masalah: '', divisi: divisi, lampiran: { mime: mime, base64: b64 }, konteks: konteksLapangan() });
       }).then(function (s) {
         if (!s || !s.ok) throw new Error(s ? s.pesan : 'gagal');
         return { namaFile: file.name, transkrip: '', masalah: '(dari file ' + file.name + ')', jawaban: s.jawaban, ringkasan: '' };
@@ -447,7 +491,7 @@
     } else if (jenis === 'excel') {
       return bacaExcel(file).then(function (teks) {
         var gab = 'ISI FILE EXCEL (' + file.name + '):\n' + teks;
-        return panggil("cariSolusi", { masalah: gab, divisi: divisi }).then(function (s) {
+        return panggil("cariSolusi", { masalah: gab, divisi: divisi, konteks: konteksLapangan() }).then(function (s) {
           if (!s || !s.ok) throw new Error(s ? s.pesan : 'gagal');
           return { namaFile: file.name, transkrip: '', masalah: gab, jawaban: s.jawaban, ringkasan: '' };
         });
@@ -519,7 +563,7 @@
     hasilList = [];
     hasil.innerHTML = '<div id="progresBatch"></div><div id="kontainerHasil"></div>';
     document.getElementById('progresBatch').innerHTML = loadingHtml('AI sedang membaca pustaka & menyusun analisa + solusi...<br><small>(10-40 detik)</small>');
-    panggil("cariSolusi", { masalah: masalah, divisi: divisi }).then(function (res) {
+    panggil("cariSolusi", { masalah: masalah, divisi: divisi, konteks: konteksLapangan() }).then(function (res) {
       tombol.disabled = false; tombol.textContent = '🔎 Cari Solusi';
       document.getElementById('progresBatch').innerHTML = '';
       if (res && res.ok) {
