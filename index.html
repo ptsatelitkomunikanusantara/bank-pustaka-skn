@@ -66,8 +66,8 @@
 
     <div class="row">
       <label for="berkas">📎 File bukti (boleh pilih banyak — tahan Ctrl)</label>
-      <input type="file" id="berkas" multiple accept="audio/*,image/*,.pdf,.xlsx,.xls,.csv,.opus,.ogg,.oga,.m4a,.m4b,.mp4,.mp3,.wav,.flac,.amr">
-      <p class="hint">Rekaman (voice note WA .opus/.ogg, mp3, m4a, wav) · <b>.amr (rekaman telepon HP)</b> · Foto/screenshot (jpg/png) · PDF · Excel. Maks 18 MB per file.</p>
+      <input type="file" id="berkas" multiple accept="audio/*,video/*,image/*,.pdf,.xlsx,.xls,.csv,.opus,.ogg,.oga,.m4a,.m4b,.mp4,.mp3,.wav,.flac,.amr,.mov,.webm,.3gp">
+      <p class="hint">Rekaman (voice note WA .opus/.ogg, mp3, m4a, wav) · <b>.amr (rekaman telepon HP)</b> · <b>video screen record (mp4/mov/webm)</b> — AI baca isi layar &amp; suaranya · Foto/screenshot (jpg/png) · PDF · Excel. <b>Maks 18 MB per file</b> (video panjang: potong dulu).</p>
       <div id="daftarFile"></div>
     </div>
 
@@ -247,9 +247,33 @@
       r.readAsArrayBuffer(file);
     });
   }
+  // Cek apakah file benar-benar punya GAMBAR (video track). WAJIB: .mp4/.mpeg dipakai
+  // voice note WA (audio) DAN screen record (video) — salah tebak = Gemini error 400.
+  function adaVideoTrack(file) {
+    return new Promise(function (res) {
+      try {
+        var v = document.createElement('video');
+        var url = URL.createObjectURL(file);
+        var selesai = false;
+        var tutup = function (hasil) { if (selesai) return; selesai = true; try { URL.revokeObjectURL(url); } catch (e) {} res(hasil); };
+        v.preload = 'metadata';
+        v.onloadedmetadata = function () { tutup(v.videoWidth > 0 && v.videoHeight > 0); };
+        v.onerror = function () { tutup(false); };
+        setTimeout(function () { tutup(false); }, 8000);
+        v.src = url;
+      } catch (e) { res(false); }
+    });
+  }
+  function mimeVideoDari(name, tipe) {
+    if (tipe && tipe.indexOf('video/') === 0) return tipe;
+    var ext = (name || '').toLowerCase().split('.').pop();
+    return ({ mp4:'video/mp4', mov:'video/quicktime', webm:'video/webm', '3gp':'video/3gpp',
+              avi:'video/avi', mpeg:'video/mpeg', mpg:'video/mpeg', wmv:'video/wmv', flv:'video/x-flv' })[ext] || 'video/mp4';
+  }
   function jenisFile(name) {
     var ext = (name || '').toLowerCase().split('.').pop();
-    if (['opus','ogg','oga','m4a','m4b','mp4','mp3','mpeg','mpga','wav','flac','aac','aiff','aif','amr'].indexOf(ext) >= 0) return 'audio';
+    if (['opus','ogg','oga','m4a','m4b','mp4','mp3','mpeg','mpga','wav','flac','aac','aiff','aif','amr',
+         'mov','webm','3gp','avi','mpg','wmv','flv'].indexOf(ext) >= 0) return 'audio';
     if (['jpg','jpeg','png','webp','heic','heif'].indexOf(ext) >= 0) return 'gambar';
     if (ext === 'pdf') return 'pdf';
     if (['xlsx','xls','csv'].indexOf(ext) >= 0) return 'excel';
@@ -562,8 +586,11 @@
     if (file.size > 18 * 1024 * 1024) return Promise.reject(new Error('file terlalu besar (' + (file.size / 1048576).toFixed(1) + ' MB, maks 18 MB)'));
     var jenis = jenisFile(file.name);
     if (jenis === 'audio') {
-      return bacaBase64(file).then(function (b64) {
-        return panggil("transkripsiRekaman", { base64: b64, namaFile: file.name, bahasa: bahasa || '', divisi: divisi });
+      return adaVideoTrack(file).then(function (adaGambar) {
+        var mimeKirim = adaGambar ? mimeVideoDari(file.name, file.type) : '';   // kosong = biar backend tebak dari ekstensi (audio)
+        return bacaBase64(file).then(function (b64) {
+          return panggil("transkripsiRekaman", { base64: b64, namaFile: file.name, bahasa: bahasa || '', divisi: divisi, mime: mimeKirim });
+        });
       }).then(function (t) {
         if (!t || !t.ok) throw new Error(t ? t.pesan : 'gagal transkrip');
         return panggil("cariSolusi", { masalah: t.transkrip, divisi: divisi, konteks: kon }).then(function (s) {
