@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Asisten Solusi SKN</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   * { box-sizing: border-box; }
@@ -180,6 +180,7 @@
   function bacaBase64(file) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res((r.result.split(',')[1]) || ''); }; r.onerror = function () { rej(new Error('gagal baca file')); }; r.readAsDataURL(file); }); }
   function bacaExcel(file) {
     return new Promise(function (res, rej) {
+      if (typeof XLSX === 'undefined') { rej(new Error('Pembaca Excel belum termuat (koneksi/CDN). Refresh halaman (Ctrl+Shift+R), atau ketik/tempel datanya manual di kotak bawah.')); return; }
       var r = new FileReader();
       r.onload = function () {
         try { var wb = XLSX.read(new Uint8Array(r.result), { type: 'array' }); var teks = '';
