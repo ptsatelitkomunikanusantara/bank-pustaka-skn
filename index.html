@@ -66,8 +66,8 @@
 
     <div class="row">
       <label for="berkas">📎 File bukti (boleh pilih banyak — tahan Ctrl)</label>
-      <input type="file" id="berkas" multiple accept="audio/*,image/*,.pdf,.xlsx,.xls,.csv,.opus,.ogg,.oga,.m4a,.m4b,.mp4,.mp3,.wav,.flac">
-      <p class="hint">Rekaman (voice note WA .opus/.ogg, mp3, m4a, wav) · Foto/screenshot (jpg/png) · PDF · Excel. Maks 18 MB per file. File .amr convert dulu ke mp3.</p>
+      <input type="file" id="berkas" multiple accept="audio/*,image/*,.pdf,.xlsx,.xls,.csv,.opus,.ogg,.oga,.m4a,.m4b,.mp4,.mp3,.wav,.flac,.amr">
+      <p class="hint">Rekaman (voice note WA .opus/.ogg, mp3, m4a, wav) · <b>.amr (rekaman telepon HP)</b> · Foto/screenshot (jpg/png) · PDF · Excel. Maks 18 MB per file.</p>
     </div>
 
     <div class="row grid2">
@@ -172,7 +172,7 @@
       </div>
       <div class="row">
         <label for="brSuara">🎙️ Upload rekaman briefing <span style="font-weight:400;color:#6b7280;">(AI ubah jadi notulensi)</span></label>
-        <input type="file" id="brSuara" accept="audio/*,.opus,.ogg,.oga,.m4a,.mp3,.wav,.flac">
+        <input type="file" id="brSuara" accept="audio/*,.opus,.ogg,.oga,.m4a,.mp3,.wav,.flac,.amr">
       </div>
       <div class="row">
         <label for="brPoin">…atau ketik / tempel notulensi</label>
@@ -240,7 +240,7 @@
   }
   function jenisFile(name) {
     var ext = (name || '').toLowerCase().split('.').pop();
-    if (['opus','ogg','oga','m4a','m4b','mp4','mp3','mpeg','mpga','wav','flac','aac','aiff','aif'].indexOf(ext) >= 0) return 'audio';
+    if (['opus','ogg','oga','m4a','m4b','mp4','mp3','mpeg','mpga','wav','flac','aac','aiff','aif','amr'].indexOf(ext) >= 0) return 'audio';
     if (['jpg','jpeg','png','webp','heic','heif'].indexOf(ext) >= 0) return 'gambar';
     if (ext === 'pdf') return 'pdf';
     if (['xlsx','xls','csv'].indexOf(ext) >= 0) return 'excel';
