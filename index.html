@@ -68,6 +68,7 @@
       <label for="berkas">📎 File bukti (boleh pilih banyak — tahan Ctrl)</label>
       <input type="file" id="berkas" multiple accept="audio/*,image/*,.pdf,.xlsx,.xls,.csv,.opus,.ogg,.oga,.m4a,.m4b,.mp4,.mp3,.wav,.flac,.amr">
       <p class="hint">Rekaman (voice note WA .opus/.ogg, mp3, m4a, wav) · <b>.amr (rekaman telepon HP)</b> · Foto/screenshot (jpg/png) · PDF · Excel. Maks 18 MB per file.</p>
+      <div id="daftarFile"></div>
     </div>
 
     <div class="row grid2">
@@ -257,6 +258,28 @@
     dl.innerHTML = ''; arr.forEach(function (v) { var o = document.createElement('option'); o.value = v; dl.appendChild(o); });
   }
 
+  // ====== DAFTAR FILE + TOKO PER FILE ======
+  function renderDaftarFile() {
+    var input = document.getElementById('berkas'), area = document.getElementById('daftarFile');
+    if (!input || !area) return;
+    if (!input.files || !input.files.length) { area.innerHTML = ''; return; }
+    var files = Array.prototype.slice.call(input.files);
+    var h = '<div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px; margin-top:12px;">'
+          + '<div style="font-size:13px; font-weight:600; color:#1d4ed8; margin-bottom:4px;">🏪 Toko untuk tiap file</div>'
+          + '<div class="hint" style="margin:0 0 10px;">Isi kalau file-nya dari toko berbeda-beda. <b>Dikosongkan = AI menebak sendiri</b> dari isi rekaman.</div>';
+    for (var i = 0; i < files.length; i++) {
+      h += '<div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">'
+         + '<span style="flex:1.2; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(files[i].name) + '">📄 ' + esc(files[i].name) + '</span>'
+         + '<input type="text" id="fToko_' + i + '" list="fbTokoList" placeholder="toko file ini (opsional)" style="flex:1; padding:8px; font-size:13px;">'
+         + '</div>';
+    }
+    area.innerHTML = h + '</div>';
+  }
+  function tokoFile(i) {
+    var el = document.getElementById('fToko_' + i);
+    return el ? String(el.value || '').trim() : '';
+  }
+
   // ====== KONTEKS untuk analisa ======
   function konteksLapangan() {
     var mode = document.getElementById('brBaru').style.display === 'none' ? 'pakai' : 'baru';
@@ -336,6 +359,7 @@
     var a = document.getElementById('fbTanggal'); if (a) a.value = hariIni();
     var b = document.getElementById('brTanggal'); if (b) b.value = hariIni();
     var s = document.getElementById('brPilih'); if (s) s.onchange = tampilCuplikan;
+    var f = document.getElementById('berkas'); if (f) f.onchange = renderDaftarFile;
     muatDaftarBuku(); muatBahasaKamus(); muatRingkasData(); muatBriefingPilihan();
   })();
 
@@ -544,7 +568,7 @@
     var files = Array.prototype.slice.call(input.files);
     var divisi = document.getElementById('divisi').value;
     var bahasa = document.getElementById('bahasaKamus').value;
-    var kon = konteksLapangan();
+    var konBase = konteksLapangan();
 
     hasilList = [];
     kartu.style.display = 'block';
@@ -555,7 +579,13 @@
     for (var i = 0; i < files.length; i++) {
       var f = files[i];
       tombol.textContent = 'Memproses ' + (i + 1) + '/' + files.length + '...';
-      progres.innerHTML = loadingHtml('Memproses file ' + (i + 1) + ' dari ' + files.length + ':<br><b>' + esc(f.name) + '</b><br><small>(20-60 detik/file)</small>');
+      var kon = {
+        namaSales: konBase.namaSales, area: konBase.area, tanggal: konBase.tanggal,
+        leader: konBase.leader, tanggalBriefing: konBase.tanggalBriefing,
+        namaToko: (tokoFile(i) || konBase.namaToko)   // toko khusus file ini; kalau kosong pakai daftar umum
+      };
+      progres.innerHTML = loadingHtml('Memproses file ' + (i + 1) + ' dari ' + files.length + ':<br><b>' + esc(f.name) + '</b>'
+        + (tokoFile(i) ? '<br><small>Toko: ' + esc(tokoFile(i)) + '</small>' : '') + '<br><small>(20-60 detik/file)</small>');
       try {
         var data = await prosesSatuFile(f, divisi, bahasa, kon);
         var idx = hasilList.length; hasilList.push(data);
